@@ -19,7 +19,7 @@ import (
 var (
 	bin = flag.String("bin", "./bin/ts-earch", "ts-earch bin path")
 	out = flag.String("out", "~/.ts-earch", "out file path")
-	dt  = flag.String("dt", "~/dev/DefinitelyTyped/types", "DefinitelyTyped types/ path")
+	dt  = flag.String("dt", "~/dev/DefinitelyTyped/types", "Modules directory")
 	x   = flag.Int("x", 0, "only extract the first X modules (extracts all when 0)")
 )
 
@@ -42,7 +42,11 @@ func execAndAppend(dir string, acc *Modules, mutex *sync.Mutex) error {
 		return err
 	}
 
-	module := Module{Name: dir}
+	name, err := filepath.Rel(filepath.Join(dir, ".."), dir)
+	if err != nil {
+		name = dir
+	}
+	module := Module{Name: name}
 
 	err = json.Unmarshal(ts, &module.Fns)
 	if err != nil {
