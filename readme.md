@@ -23,16 +23,6 @@ To **run on a single project**:
 ./bin/ts-earch /path/to/typescript/project --out out.json
 ```
 
-To **run on a single project**:
-
-```bash
-# output to the terminal
-./bin/ts-earch /path/to/typescript/project
-
-# write to a file
-./bin/ts-earch /path/to/typescript/project --out out.json
-```
-
 To **run on multiple projects**:
 
 The Go program (`main.go`) runs the indexer on all the project in a directory.
