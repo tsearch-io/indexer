@@ -25,7 +25,7 @@ To **run on a single project**:
 
 To **run on multiple projects**:
 
-The Go program (`main.go`) runs the indexer on all the project in a directory.
+The Go program (`main.go`) runs the indexer on all the projects in a directory.
 
 ```bash
 # build first, no dependencies required
