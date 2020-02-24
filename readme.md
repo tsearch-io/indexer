@@ -49,3 +49,8 @@ $ ./tsearch-index -out ./ -dt ~/path/to/projects/directory
 The output file will have name as date when written (eg.
 `2020-01-30-06-17-05.json`), it can be used as the `modules.json` on
 [tsearch-io/server](https://github.com/tsearch-io/server).
+
+## LICENSE
+
+[MIT License](https://github.com/tsearch-io/indexer/blob/master/LICENSE) ©
+[Christian Gill](https://gillchristian.xyz)
