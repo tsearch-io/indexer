@@ -14,8 +14,14 @@ export default function findFunctions(
     skipFileDependencyResolution: true,
   })
 
-  const filesGlob = path.join(directory, 'src', '**', '*.ts')
-  const packageJson = require(path.join(directory, 'package.json'))
+  const filesGlob = path.join(directory, '**', '*.ts')
+  let packageJson
+  try {
+    packageJson = require(path.join(directory, 'package.json'))
+  } catch (e) {
+    packageJson = {}
+  }
+
   const moduleName =
     packageJson?.name ?? path.relative(path.join(directory, '..'), directory)
 
