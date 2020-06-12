@@ -1,9 +1,11 @@
+import path from 'path'
+
 import * as ts from 'ts-morph'
 
 import {FunctionRecord, callSignature} from './types'
 
 export default function findFunctions(
-  fileNames: string[],
+  directory: string,
   options: ts.ProjectOptions,
 ): FunctionRecord[] {
   const project = new ts.Project({
@@ -12,11 +14,15 @@ export default function findFunctions(
     skipFileDependencyResolution: true,
   })
 
-  project.addSourceFilesAtPaths(fileNames)
+  const filesGlob = path.join(directory, 'src', '**', '*.ts')
+  const packageJson = require(path.join(directory, 'package.json'))
+  const moduleName =
+    packageJson?.name ?? path.relative(path.join(directory, '..'), directory)
+
+  project.addSourceFilesAtPaths(filesGlob)
 
   return project.getSourceFiles().reduce<FunctionRecord[]>((acc, file) => {
-    const path = dtPath(file.getFilePath())
-    const module = dtModuleName(path)
+    const fileName = path.relative(directory, file.getFilePath())
 
     const entries = Array.from(file.getExportedDeclarations().entries())
 
@@ -24,12 +30,12 @@ export default function findFunctions(
       (acc, [_indentifier, exports]) => {
         exports.forEach(exp => {
           if (ts.TypeGuards.isFunctionDeclaration(exp)) {
-            acc.push(functionDeclaration(exp, path, module))
+            acc.push(functionDeclaration(exp, fileName, moduleName))
             return
           }
 
           if (ts.TypeGuards.isVariableDeclaration(exp)) {
-            const fn = arrowFunction(exp, path, module)
+            const fn = arrowFunction(exp, fileName, moduleName)
             if (fn) {
               acc.push(fn)
             }
@@ -48,7 +54,7 @@ export default function findFunctions(
 
 function functionDeclaration(
   node: ts.FunctionDeclaration,
-  path: string,
+  file: string,
   module: string,
 ): FunctionRecord {
   return {
@@ -65,7 +71,7 @@ function functionDeclaration(
     }),
     module,
     location: {
-      path,
+      path: file,
       lines: {
         from: node.getStartLineNumber(),
         to: node.getEndLineNumber(),
@@ -76,7 +82,7 @@ function functionDeclaration(
 
 function arrowFunction(
   node: ts.VariableDeclaration,
-  path: string,
+  file: string,
   module: string,
 ): FunctionRecord | undefined {
   const [arrow] = node.getChildrenOfKind(ts.SyntaxKind.ArrowFunction)
@@ -99,19 +105,11 @@ function arrowFunction(
     }),
     module,
     location: {
-      path,
+      path: file,
       lines: {
         from: node.getStartLineNumber(),
         to: node.getEndLineNumber(),
       },
     },
   }
-}
-
-function dtModuleName(path: string) {
-  return path.split('/')[0]
-}
-
-function dtPath(path: string) {
-  return path.replace(/^.*DefinitelyTyped\/types\//, '')
 }

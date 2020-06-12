@@ -2,10 +2,7 @@ import * as ts from 'ts-morph'
 
 export interface Location {
   path: string
-  lines: {
-    from: number
-    to: number
-  }
+  lines: {from: number; to: number}
 }
 
 export interface FunctionRecord {
@@ -22,11 +19,17 @@ export interface Module {
   fns: FunctionRecord[]
 }
 
-// --- Type
-
-export interface Base {
-  text: string
+interface Param {
+  name: string
+  type: Type
 }
+
+export interface SignatureT {
+  parameters: Param[]
+  returnType: Type
+}
+
+// --- Type
 
 export interface Any {
   __tag: 'Any'
@@ -36,100 +39,82 @@ export interface Unknown {
   __tag: 'Unknown'
 }
 
+export interface Never {
+  __tag: 'Never'
+}
+
+export interface Void {
+  __tag: 'Void'
+}
+
 export interface Undefined {
   __tag: 'Undefined'
 }
 
+export interface Null {
+  __tag: 'Null'
+}
+
 export interface LiteralString {
   __tag: 'LiteralString'
-  value: string
+  values: string
 }
 
 export interface LiteralNumber {
   __tag: 'LiteralNumber'
-  value: number
+  values: number
 }
 
-export interface LiteralBoolean {
-  __tag: 'LiteralBoolean'
-  value: boolean
+export interface LiteralBool {
+  __tag: 'LiteralBool'
+  values: boolean
 }
 
-export interface Primitive extends Base {
-  __tag: 'Primitive'
-  typeName: 'string' | 'number' | 'boolean'
+export interface Bool {
+  __tag: 'BoolT'
 }
 
-export interface ArrayT extends Base {
-  __tag: 'Array'
-  elementsType: Type
+export interface StringT {
+  __tag: 'StringT'
 }
 
-export interface Union extends Base {
-  __tag: 'Union'
-  types: Type[]
+export interface NumberT {
+  __tag: 'NumberT'
 }
 
-export interface Intersection extends Base {
-  __tag: 'Intersection'
-  types: Type[]
-}
-
-export interface Tuple extends Base {
-  __tag: 'Tuple'
-  types: Type[]
-}
-
-export interface SignatureT {
-  typeParameters: TypeParameter[]
-  parameters: {name: string; type: Type}[]
-  returnType: Type
-}
-
-export interface FunctionT extends Base {
-  __tag: 'Function'
-  signature: SignatureT
-}
-
-export interface HigherOrder extends Base {
-  __tag: 'HigherOrder'
-  arguments: Type[]
-}
-
-export interface Other extends Base {
+export interface Other {
   __tag: 'Other'
+  values: string
 }
 
 export type Type =
   | Any
   | Unknown
+  | Never
+  | Void
   | Undefined
+  | Null
   | LiteralString
   | LiteralNumber
-  | LiteralBoolean
-  | Primitive
-  | ArrayT
-  | Union
-  | Intersection
-  | Tuple
-  | FunctionT
-  | HigherOrder
+  | LiteralBool
+  | Bool
+  | StringT
+  | NumberT
   | Other
 
 interface TypeMatcher<R> {
   Any: (v: Any) => R
   Unknown: (v: Unknown) => R
+  Never: (v: Never) => R
+  Void: (v: Void) => R
   Undefined: (v: Undefined) => R
+  Null: (v: Null) => R
   LiteralString: (v: LiteralString) => R
   LiteralNumber: (v: LiteralNumber) => R
-  LiteralBoolean: (v: LiteralBoolean) => R
-  Primitive: (v: Primitive) => R
-  Array: (v: ArrayT) => R
-  Union: (v: Union) => R
-  Intersection: (v: Intersection) => R
-  Tuple: (v: Tuple) => R
-  Function: (v: FunctionT) => R
-  HigherOrder: (v: HigherOrder) => R
+  LiteralBool: (v: LiteralBool) => R
+  Bool: (v: Bool) => R
+  StringT: (v: StringT) => R
+  NumberT: (v: NumberT) => R
   Other: (v: Other) => R
 }
 
@@ -139,28 +124,26 @@ const matchType = <R>(m: TypeMatcher<R>) => (t: Type): R => {
       return m.Any(t)
     case 'Unknown':
       return m.Unknown(t)
+    case 'Void':
+      return m.Void(t)
+    case 'Never':
+      return m.Never(t)
     case 'Undefined':
       return m.Undefined(t)
+    case 'Null':
+      return m.Null(t)
     case 'LiteralString':
       return m.LiteralString(t)
     case 'LiteralNumber':
       return m.LiteralNumber(t)
-    case 'LiteralBoolean':
-      return m.LiteralBoolean(t)
-    case 'Primitive':
-      return m.Primitive(t)
-    case 'Array':
-      return m.Array(t)
-    case 'Union':
-      return m.Union(t)
-    case 'Intersection':
-      return m.Intersection(t)
-    case 'Tuple':
-      return m.Tuple(t)
-    case 'Function':
-      return m.Function(t)
-    case 'HigherOrder':
-      return m.HigherOrder(t)
+    case 'LiteralBool':
+      return m.LiteralBool(t)
+    case 'BoolT':
+      return m.Bool(t)
+    case 'StringT':
+      return m.StringT(t)
+    case 'NumberT':
+      return m.NumberT(t)
     case 'Other':
       return m.Other(t)
     default:
@@ -169,35 +152,29 @@ const matchType = <R>(m: TypeMatcher<R>) => (t: Type): R => {
 }
 
 export const stringifySignature = (s: SignatureT): string => {
-  const typeParams = s.typeParameters.map(stringifyTypeParam).join(', ')
   const params = s.parameters
     .map(({name, type}, i) => `${name || 't' + i}: ${stringifyType(type)}`)
     .join(', ')
   const returnType = stringifyType(s.returnType)
 
-  return s.typeParameters.length === 0
-    ? `(${params}) => ${returnType}`
-    : `<${typeParams}>(${params}) => ${returnType}`
+  return `(${params}) => ${returnType}`
 }
 
 function stringifyType(t: Type): string {
   return matchType<string>({
     Any: () => 'any',
     Unknown: () => 'unknown',
+    Void: () => 'void',
+    Never: () => 'never',
     Undefined: () => 'undefined',
-    LiteralString: ({value}) => value,
-    LiteralNumber: ({value}) => value.toString(),
-    LiteralBoolean: ({value}) => value.toString(),
-    Primitive: ({typeName}) => typeName,
-    Array: ({elementsType}) => `${stringifyType(elementsType)}[]`,
-    Union: ({types}) => types.map(stringifyType).join(' | '),
-    Intersection: ({types}) => types.map(stringifyType).join(' & '),
-    Tuple: ({types}) => `[${types.map(stringifyType).join(', ')}]`,
-    // TODO: handle several as well as none (which shouldn't the case)
-    Function: ({signature: s}) => stringifySignature(s),
-    // TODO HigherOrder should have type name separated from parameters
-    HigherOrder: ({text}) => text,
-    Other: ({text}) => text,
+    Null: () => 'null',
+    LiteralString: ({values}) => values,
+    LiteralNumber: ({values}) => values.toString(),
+    LiteralBool: ({values}) => values.toString(),
+    Bool: () => 'boolean',
+    StringT: () => 'string',
+    NumberT: () => 'number',
+    Other: ({values}) => values,
   })(t)
 }
 
@@ -205,85 +182,36 @@ export const Type = {
   match: matchType,
   isAny: (t: Type): t is Any => t.__tag === 'Any',
   isUnknown: (t: Type): t is Unknown => t.__tag === 'Unknown',
+  isNever: (t: Type): t is Never => t.__tag === 'Never',
+  isVoid: (t: Type): t is Void => t.__tag === 'Void',
   isUndefined: (t: Type): t is Undefined => t.__tag === 'Undefined',
+  isNull: (t: Type): t is Null => t.__tag === 'Null',
   isLiteralString: (t: Type): t is LiteralString => t.__tag === 'LiteralString',
   isLiteralNumber: (t: Type): t is LiteralNumber => t.__tag === 'LiteralNumber',
-  isLiteralBoolean: (t: Type): t is LiteralBoolean =>
-    t.__tag === 'LiteralBoolean',
-  isPrimitive: (t: Type): t is Primitive => t.__tag === 'Primitive',
-  isArray: (t: Type): t is ArrayT => t.__tag === 'Array',
-  isUnion: (t: Type): t is Union => t.__tag === 'Union',
-  isIntersection: (t: Type): t is Intersection => t.__tag === 'Intersection',
-  isTuple: (t: Type): t is Tuple => t.__tag === 'Tuple',
-  isFunction: (t: Type): t is FunctionT => t.__tag === 'Function',
-  isHigherOrder: (t: Type): t is HigherOrder => t.__tag === 'HigherOrder',
+  isLiteralBool: (t: Type): t is LiteralBool => t.__tag === 'LiteralBool',
+  isBool: (t: Type): t is Bool => t.__tag === 'BoolT',
+  isString: (t: Type): t is StringT => t.__tag === 'StringT',
+  isNumber: (t: Type): t is NumberT => t.__tag === 'NumberT',
   isOther: (t: Type): t is Other => t.__tag === 'Other',
   stringify: stringifyType,
 }
 
-// --- TypeParameters
-
-// TODO: should have name separated from text
-interface Constrained extends Base {
-  __tag: 'Constrained'
-  constraint: Type
-}
-
-// TODO: should have name separated from text
-interface WithDefault extends Base {
-  __tag: 'WithDefault'
-  default: Type
-}
-
-interface Polymorphic extends Base {
-  __tag: 'Polymorphic'
-}
-
-export type TypeParameter = Constrained | WithDefault | Polymorphic
-
-interface TypeParameterMatcher<R> {
-  Constrained: (v: Constrained) => R
-  WithDefault: (v: WithDefault) => R
-  Polymorphic: (v: Polymorphic) => R
-}
-
-const matchTypeParamer = <R>(m: TypeParameterMatcher<R>) => (
-  tp: TypeParameter,
-): R => {
-  switch (tp.__tag) {
-    case 'Constrained':
-      return m.Constrained(tp)
-    case 'WithDefault':
-      return m.WithDefault(tp)
-    case 'Polymorphic':
-      return m.Polymorphic(tp)
-    default:
-      throw new Error(`Unrecognized Type: ${JSON.stringify(tp)}`)
-  }
-}
-
-function stringifyTypeParam(t: TypeParameter): string {
-  return matchTypeParamer<string>({
-    Constrained: ({text, constraint}) =>
-      `${text} extends ${stringifyType(constraint)}`,
-    WithDefault: ({text, default: d}) => `${text} = ${stringifyType(d)}`,
-    Polymorphic: ({text}) => text,
-  })(t)
-}
-
-export const TypeParameter = {
-  match: matchTypeParamer,
-  stringify: stringifyTypeParam,
-}
-
-export interface Param {
-  name: string
-  type: string
-  isGeneric: boolean
-}
-
 export function type(t: ts.Type<ts.ts.Type>): Type {
-  const text = t.getText()
+  const text = t.getText() || ''
+
+  const flags = t.getFlags()
+
+  if (t.isNull()) {
+    return {__tag: 'Null'}
+  }
+
+  if (ts.ts.TypeFlags.Void === flags) {
+    return {__tag: 'Void'}
+  }
+
+  if (ts.ts.TypeFlags.Never === flags) {
+    return {__tag: 'Never'}
+  }
 
   if (t.isAny()) {
     return {__tag: 'Any'}
@@ -297,74 +225,31 @@ export function type(t: ts.Type<ts.ts.Type>): Type {
     return {__tag: 'Undefined'}
   }
 
-  if (t.isArray()) {
-    const elemType = t.getArrayElementType()
-
-    return elemType
-      ? {__tag: 'Array', text, elementsType: type(elemType)}
-      : {__tag: 'Array', text, elementsType: {__tag: 'Any'}}
-  }
-
   if (t.isBooleanLiteral()) {
-    return {__tag: 'LiteralBoolean', value: text === 'true'}
+    return {__tag: 'LiteralBool', values: text === 'true'}
   }
 
   if (t.isNumberLiteral()) {
-    return {__tag: 'LiteralNumber', value: parseFloat(text)}
+    return {__tag: 'LiteralNumber', values: parseFloat(text)}
   }
 
   if (t.isStringLiteral()) {
-    return {__tag: 'LiteralString', value: text}
+    return {__tag: 'LiteralString', values: text}
   }
 
   if (t.isString()) {
-    return {__tag: 'Primitive', text, typeName: 'string'}
+    return {__tag: 'StringT'}
   }
 
   if (t.isNumber()) {
-    return {__tag: 'Primitive', text, typeName: 'number'}
+    return {__tag: 'NumberT'}
   }
 
   if (t.isBoolean()) {
-    return {__tag: 'Primitive', text, typeName: 'boolean'}
+    return {__tag: 'BoolT'}
   }
 
-  if (t.isUnion()) {
-    return {__tag: 'Union', text, types: t.getUnionTypes().map(type)}
-  }
-
-  if (t.isIntersection()) {
-    return {__tag: 'Union', text, types: t.getIntersectionTypes().map(type)}
-  }
-
-  if (t.isTuple()) {
-    return {__tag: 'Tuple', text, types: t.getTupleElements().map(type)}
-  }
-
-  // TODO: Is this the right way to know if it's function ?
-  // const css = t.getCallSignatures()
-  // if (css.length > 0) {
-  //   return {
-  //     __tag: 'function',
-  //     text,
-  //     signatures: css.map(s =>
-  //       callSignature({
-  //         parameters: s.getParameters(),
-  //         typeParameters: s.getTypeParameters(),
-  //         returnType: s.getReturnType(),
-  //       }),
-  //     ),
-  //   }
-  // }
-
-  // TODO: not recognized as HigherOrder `Record<string, string | string[]>`
-  const typeArgs = t.getTypeArguments()
-  if (typeArgs.length > 0) {
-    return {__tag: 'HigherOrder', text, arguments: typeArgs.map(type)}
-  }
-
-  // TODO: `Foo | null` -> is not considered union ?
-  return {__tag: 'Other', text}
+  return {__tag: 'Other', values: text}
 }
 
 interface SignatureArgs {
@@ -375,7 +260,6 @@ interface SignatureArgs {
 
 export function callSignature({
   parameters,
-  typeParameters,
   returnType,
 }: SignatureArgs): SignatureT {
   return {
@@ -383,26 +267,6 @@ export function callSignature({
       name: p.getName(),
       type: type(p.getType()),
     })),
-    typeParameters: typeParameters.map(p => typeParameter(p.getType())),
     returnType: type(returnType),
   }
-}
-
-export function typeParameter(tp: ts.TypeParameter): TypeParameter {
-  const constraint = tp.getConstraint()
-
-  // TODO: text is not the name !!!
-  const base = {text: tp.getText()}
-
-  if (constraint) {
-    return {...base, __tag: 'Constrained', constraint: type(constraint)}
-  }
-
-  const default_ = tp.getDefault()
-
-  if (default_) {
-    return {...base, __tag: 'WithDefault', default: type(default_)}
-  }
-
-  return {...base, __tag: 'Polymorphic'}
 }
